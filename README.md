@@ -1,1 +1,1 @@
-# morphiq-labs-mudra-skills
+# morphiq-labs-skills
