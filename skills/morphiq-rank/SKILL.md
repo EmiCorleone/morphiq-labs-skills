@@ -2,15 +2,22 @@
 name: morphiq-rank
 description: This skill should be used when the user asks to "create issues from a scan", "prioritize what to fix", "rank the issues", "build a roadmap from scan results", "run Morphiq Rank", or mentions creating a prioritized roadmap from scan results. Consumes a Morphiq Scan Report, applies issue creation criteria with impact/effort weighting, and organizes issues into 4 progressive discovery tiers.
 metadata:
-  version: "0.1.0"
+  version: "0.1.1"
   author: morphiq-labs
 ---
+
+## EXECUTION INSTRUCTIONS
+
+You are now executing Morphiq Rank. This is a WORKFLOW — you must read the Scan Report, create issues, compute priority scores, and produce a Prioritized Roadmap. Do NOT just describe what the skill does. EXECUTE the steps.
+
+**Input:** Read `MORPHIQ-SCAN.json` from the workspace root (produced by morphiq-scan). If the scan just ran in this session, use the scan results from context.
+**Output:** You MUST write a Prioritized Roadmap JSON file to `MORPHIQ-RANK.json` in the workspace root AND display a human-readable summary.
 
 ## Pipeline Position
 
 Step 2 of 4 — consumes morphiq-scan output.
-- **Input:** Scan Report (JSON) from morphiq-scan.
-- **Output:** Prioritized Roadmap (JSON) → consumed by morphiq-build.
+- **Input:** Scan Report (JSON) from morphiq-scan — either `MORPHIQ-SCAN.json` or in-context results.
+- **Output:** Prioritized Roadmap JSON file (`MORPHIQ-RANK.json`) → consumed by morphiq-build.
 - **Data contract:** See `PIPELINE.md` §2 for the Prioritized Roadmap schema.
 
 ## Purpose
@@ -25,19 +32,24 @@ Parse the Scan Report JSON. Extract per-page scores, domain-level scores, all id
 
 ### Step 2: Create Issues
 
-For each finding, create a formal issue:
+For each finding, create a formal issue. You MUST use the EXACT issue IDs defined in `references/issue-catalog.md`. Do NOT invent abbreviations like "PF-001" or "AR-002".
+
+Examples of correct IDs: `policy-no-llms-txt`, `agentic-missing-product-schema`, `content-no-tldr`, `chunking-buried-answer`, `fanout-no-comparison-content`.
 
 | Field | Description |
 |---|---|
-| `id` | Pattern: `{category}-{specific-problem}` |
-| `category` | `agentic_readiness`, `content_quality`, `chunking_retrieval`, `query_fanout`, `policy_files`, `ai_visibility` |
+| `id` | EXACT ID from issue-catalog.md in `{category}-{specific-problem}` format |
+| `category` | One of: `agentic_readiness`, `content_quality`, `chunking_retrieval`, `query_fanout`, `policy_files`, `ai_visibility` |
 | `severity` | From issue catalog + escalation rules |
 | `summary` | One-line description |
 | `detail` | Full explanation with AI visibility impact |
 | `affected_urls` | URLs where the issue appears |
 | `remediation_hint` | Actionable fix instruction |
+| `priority_score` | Computed in Step 4 — include the numeric score |
 
 For fanout issues, severity depends on parent prompt type fan-out depth. `site:` and citation-producing sub-queries escalate one level.
+
+**Thoroughness check:** A site scoring ~60/100 typically has 15–25 issues across all 6 categories. If you find fewer than 10, re-read the issue catalog and check every issue type against the scan data. Each page should generate at least 2–3 issues.
 
 **Deduplication:** Technical issues hash by `brandId + checkCode + pageUrl`. AI visibility issues hash by `brandId + category + title`.
 
@@ -66,11 +78,13 @@ severity: critical=100, high=75, medium=50, low=25. page_impact: % pages affecte
 
 ### Step 5: Apply Progressive Reveal
 
-**Score-based:** <30 → fundamental only, ≥30 → +intermediate, ≥60 → +advanced, ≥80 → all tiers.
+**Score-based reveal** — controls which tiers are shown to the user:
+- Score <30 → Show Tier 1 (Foundation) only
+- Score ≥30 → Show Tiers 1–2 (Foundation + Structure)
+- Score ≥60 → Show Tiers 1–3 (Foundation + Structure + Content)
+- Score ≥80 → Show all 4 tiers
 
-**Page-based:** First run = homepage only. Each subsequent run unlocks one more page (home → pricing → features → product → solutions → about → blog → other → docs).
-
-**Backlog cap:** Max 10 issues in `identified` state.
+Show ALL issues across all scanned pages for the revealed tiers. Do not limit to homepage only.
 
 ### Step 6: Set Dependencies
 
@@ -78,7 +92,15 @@ Cross-tier: `T1 → T2 → T3 → T4`. Higher-tier issues on same URLs only beco
 
 ### Step 7: Produce Prioritized Roadmap
 
-Assemble JSON (`PIPELINE.md` §2): issues by tier, sorted by priority, with severity, remediation hints, affected URLs, dependencies, and reveal state metadata.
+Write the Prioritized Roadmap as JSON to `MORPHIQ-RANK.json` in the workspace root. The JSON MUST follow the schema in `PIPELINE.md` §2.
+
+**Required in the JSON:**
+- `source_scan_score` — the overall score from the scan
+- `total_issues` — count of all issues
+- `tiers[]` — each tier with its issues sorted by `priority_score` (descending)
+- Each issue MUST include: `id` (from catalog), `severity`, `priority_score` (numeric), `summary`, `detail`, `affected_urls`, `remediation_hint`, `dependencies`
+
+After writing the JSON file, display a human-readable roadmap showing: tier-by-tier breakdown, issue count per tier, top 3 issues per tier with severity and affected URLs, and the recommended execution order.
 
 ## Reconciliation (Re-runs)
 
