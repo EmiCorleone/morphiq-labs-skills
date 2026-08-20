@@ -61,7 +61,7 @@ def diff_geo(current: dict, previous: dict) -> dict:
     providers = set(list(current.get("per_provider", {}).keys()) +
                    list(previous.get("per_provider", {}).keys()))
     result["per_provider"] = {}
-    for provider in providers:
+    for provider in sorted(providers):
         result["per_provider"][provider] = compute_delta(
             current.get("per_provider", {}).get(provider, 0),
             previous.get("per_provider", {}).get(provider, 0)
@@ -85,7 +85,7 @@ def diff_sov(current: dict, previous: dict) -> dict:
     competitors = set(list(current.get("competitors", {}).keys()) +
                      list(previous.get("competitors", {}).keys()))
     result["competitors"] = {}
-    for comp in competitors:
+    for comp in sorted(competitors):
         result["competitors"][comp] = compute_delta(
             current.get("competitors", {}).get(comp, 0),
             previous.get("competitors", {}).get(comp, 0)
@@ -114,9 +114,9 @@ def diff_citations(current_citations: list, previous_citations: list) -> dict:
     previous_by_key = {citation_key(c): c for c in previous_citations}
 
     return {
-        "gained": [current_by_key[k] for k in gained_keys if k in current_by_key],
-        "lost": [previous_by_key[k] for k in lost_keys if k in previous_by_key],
-        "stable": [current_by_key[k] for k in stable_keys if k in current_by_key],
+        "gained": [current_by_key[k] for k in sorted(gained_keys)],
+        "lost": [previous_by_key[k] for k in sorted(lost_keys)],
+        "stable": [current_by_key[k] for k in sorted(stable_keys)],
         "total_current": len(current_citations),
         "total_previous": len(previous_citations),
         "net": len(gained_keys) - len(lost_keys),
