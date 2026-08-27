@@ -38,10 +38,15 @@ class DeterministicDiffTests(unittest.TestCase):
     def test_citation_groups_are_sorted_by_unique_key(self):
         current = [
             {"url": "https://z.example", "provider": "beta", "prompt": "two"},
+            {"url": "https://y.example", "provider": "beta", "prompt": "stable"},
             {"url": "https://a.example", "provider": "alpha", "prompt": "one"},
+            {"url": "https://b.example", "provider": "alpha", "prompt": "stable"},
         ]
         previous = [
-            {"url": "https://old.example", "provider": "alpha", "prompt": "old"}
+            {"url": "https://x.example", "provider": "beta", "prompt": "old"},
+            {"url": "https://y.example", "provider": "beta", "prompt": "stable"},
+            {"url": "https://c.example", "provider": "alpha", "prompt": "old"},
+            {"url": "https://b.example", "provider": "alpha", "prompt": "stable"},
         ]
 
         result = diff_results.diff_citations(current, previous)
@@ -49,6 +54,14 @@ class DeterministicDiffTests(unittest.TestCase):
         self.assertEqual(
             [citation["url"] for citation in result["gained"]],
             ["https://a.example", "https://z.example"],
+        )
+        self.assertEqual(
+            [citation["url"] for citation in result["lost"]],
+            ["https://c.example", "https://x.example"],
+        )
+        self.assertEqual(
+            [citation["url"] for citation in result["stable"]],
+            ["https://b.example", "https://y.example"],
         )
 
 
